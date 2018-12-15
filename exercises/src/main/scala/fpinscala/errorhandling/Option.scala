@@ -4,15 +4,40 @@ package fpinscala.errorhandling
 import scala.{Option => _, Some => _, Either => _, _} // hide std library `Option`, `Some` and `Either`, since we are writing our own in this chapter
 
 sealed trait Option[+A] {
-  def map[B](f: A => B): Option[B] = ???
+//  4.1
+  def map[B](f: A => B): Option[B] = this match {
+    case None => None
+    case Some(v) => Some(f(v))
+  }
 
-  def getOrElse[B>:A](default: => B): B = ???
+  def getOrElse[B>:A](default: => B): B = this match {
+    case None => default
+    case Some(v) => v
+  }
 
-  def flatMap[B](f: A => Option[B]): Option[B] = ???
+  def flatMap[B](f: A => Option[B]): Option[B] = this match {
+    case None => None
+    case Some(v) => f(v)
+  }
 
-  def orElse[B>:A](ob: => Option[B]): Option[B] = ???
+  def flatMap_1[B](f: A => Option[B]): Option[B] =
+    map(f) getOrElse None
 
-  def filter(f: A => Boolean): Option[A] = ???
+  def orElse[B>:A](ob: => Option[B]): Option[B] = this match {
+    case None => ob
+    case x => x
+  }
+
+  def orElse_1[B>:A](ob: => Option[B]): Option[B] =
+    this.map(Some(_)).getOrElse(ob)
+
+
+
+  def filter(f: A => Boolean): Option[A] = this match {
+    case Some(v) if f(v) => this
+    case _ => None
+  }
+
 }
 case class Some[+A](get: A) extends Option[A]
 case object None extends Option[Nothing]
@@ -38,11 +63,33 @@ object Option {
   def mean(xs: Seq[Double]): Option[Double] =
     if (xs.isEmpty) None
     else Some(xs.sum / xs.length)
-  def variance(xs: Seq[Double]): Option[Double] = ???
 
-  def map2[A,B,C](a: Option[A], b: Option[B])(f: (A, B) => C): Option[C] = ???
+//  4.2
+  def variance(xs: Seq[Double]): Option[Double] = {
+    val m = mean(xs)
+    m flatMap (v => mean(xs.map(x => math.pow(x-v, 2))))
+  }
 
-  def sequence[A](a: List[Option[A]]): Option[List[A]] = ???
 
-  def traverse[A, B](a: List[A])(f: A => Option[B]): Option[List[B]] = ???
+//  4.3
+  def map2[A,B,C](a: Option[A], b: Option[B])(f: (A, B) => C): Option[C] = {
+    a flatMap (x => b map (y => f(x, y)))
+  }
+
+//  4.4
+  def sequence[A](a: List[Option[A]]): Option[List[A]] = a match {
+    case Nil => Some(Nil)
+    case h :: t => h flatMap (hh => sequence(t).map(tt => hh :: tt))
+//      want () to be sequence(t) map f: List[A] =>
+  }
+
+//  4.5
+  def traverse[A, B](a: List[A])(f: A => Option[B]): Option[List[B]] = a match {
+    case Nil => Some(Nil)
+    case h :: t => map2(f(h), traverse(t)(f))(_ :: _)
+//    case h :: t =>  f(h).flatMap(hh => traverse(t)(f).map(tt => hh :: tt))
+  }
+
+  def sequenceViaTraverse[A](a: List[Option[A]]): Option[List[A]] =
+    traverse(a)(x => x)
 }
